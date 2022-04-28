@@ -149,3 +149,7 @@ def grad_penalty(D, X_real, X_fake, device):
     grad_norm = gradients.norm(2, 1)
     return torch.mean((grad_norm - 1) ** 2)
 
+
+
+if __name__ == "__main__":
+    create_chunks()
