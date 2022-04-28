@@ -11,7 +11,7 @@ To run the models, you need to download the [Piano](http://deepyeti.ucsd.edu/cdo
 
 To run the GAN model, first specify the path of your data in ```Piano_DS()``` when creating the dataset(TO DO WHEN scripts is finalized). Then run
 ```
-$ python3 GANs.py
+$ python3 GANs.py --batch_size BATCH --lr LR --data_dir /path/to/data --G_d GD --D_d DD --z_size Z
 ```
 
 ***VAE***
