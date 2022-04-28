@@ -575,3 +575,141 @@ class Discriminator_small(nn.Module): # technically a critic
         out = self.dense( self.flat(out) )
 
         return out
+    
+
+def train_GAN(epochs, lr, batch_size, z_size, device, G_d, D_d, k=2, save_results=True, pretrained=None):
+    
+#     G = Generator_small(input_size=z_size, d=G_d).to(device)
+#     D = Discriminator_small(d=D_d, device=device).to(device)
+    G = Generator(input_size=z_size, d=G_d).to(device)
+    D = Discriminator(d=D_d, device=device).to(device)
+
+    G_losses=[]
+    D_losses=[]
+    W_losses=[] # wasserstein loss (part of D_loss)
+    
+    pretrained_epochs = 0
+    
+    if pretrained is not None:
+        G.load_state_dict(pretrained["G_state_dict"])
+        D.load_state_dict(pretrained["D_state_dict"])
+        G_losses = pretrained["G_losses"]
+        D_losses = pretrained["D_losses"]
+        W_losses = pretrained["W_losses"]
+        pretrained_epochs = pretrained["epochs"]
+    
+    G_opt = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.9)) # CHANGE THIS?
+    D_opt = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.9))
+
+    dataset = Piano_DS(files=p50, sr=4096, output_len=4*4096)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    cumulated_epochs = pretrained_epochs + epochs
+    
+    for epoch in range(pretrained_epochs, cumulated_epochs ):
+        start = time.time()
+
+        batch_G_losses = []
+        batch_D_losses = []
+        batch_W_losses = [] # wasserstein loss (part of D_loss)
+        
+        for i, batch in enumerate(dataloader):
+            X_real = batch[0].to(device)
+            m = X_real.size(dim=0)
+
+            # Discriminator update:
+            # maximize log(D(x)) + log(1-D(G(z)))
+            # equivalent to minimize BCELoss, with real and fake samples
+            for _ in range(k):
+                z = torch.rand( size=(m ,z_size) ,device=device)*2 - 1 # unif(-1, 1)
+                with torch.no_grad(): # make sure the generator is detached
+                    X_fake = G(z)
+                y_pred_real = D(X_real)
+                y_pred_fake = D(X_fake)
+
+                D_opt.zero_grad()
+
+                D_loss = torch.mean( y_pred_fake - y_pred_real ) + 10*grad_penalty(D, X_real, X_fake, device) # WGAN-GP loss
+                D_loss.backward()
+                D_opt.step()
+
+                # record losses so we can take a mean over the entire epoch
+                D_loss_sum = m*D_loss.detach().to("cpu")
+                batch_D_losses.append(D_loss_sum)
+
+                with torch.no_grad():
+                    W_loss_sum = torch.sum(y_pred_fake - y_pred_real).to("cpu")
+                batch_W_losses.append(W_loss_sum)
+            # Generator update:
+
+
+            z = torch.rand( size=(m ,z_size) ,device=device)*2 - 1 # unif(-1, 1)
+            X_fake = G(z)
+            y_pred_fake = D(X_fake)
+
+            G_opt.zero_grad()
+
+            G_loss = -torch.mean( y_pred_fake ) # WGAN-GP loss
+            G_loss.backward()
+            G_opt.step()
+
+            # record losses so we can take a mean over the entire epoch
+            G_loss_sum = m*(G_loss.detach().to("cpu")) 
+            batch_G_losses.append(G_loss_sum)    
+
+        G_losses.append( np.sum(batch_G_losses) / len(dataloader.dataset) )
+        D_losses.append( np.sum(batch_D_losses) / len(dataloader.dataset) /k )
+        W_losses.append( np.sum(batch_W_losses) / len(dataloader.dataset) /k )
+        
+        print("Finished epoch {}, took {} min".format(epoch, (time.time()-start)/60 ))
+        print("G/D/W Losses: {}, {}, {}".format(G_losses[-1], D_losses[-1], W_losses[-1]))
+
+#         if epoch%50 == 49:
+#             try:
+#                 
+#                 gen_sound = G( torch.rand(size=(1,z_size)).to(device)*2-1 ).detach().to("cpu").numpy()[0][0]
+#                 plt.figure()
+#                 plt.plot(X_fake[0][0])
+#                 sound( gen_sound,rate=2**12)
+#             except Exception as e:
+#                 print(e)
+        # saving intermediate results at increments of 100 epochs
+        if save_results and epoch%250 == 249:
+            direc = os.path.join(  "GAN_results_piano", "Gd={}_Dd={}_e={}_lr={}_b={}_z={}_k={}".format(G_d, D_d, cumulated_epochs, lr, batch_size, z_size, k)  )
+            if not os.path.exists(direc):
+                os.makedirs(direc)
+            try:
+                torch.save(G.state_dict() , os.path.join(direc, "G_{}.pt").format(epoch+1))
+                torch.save(D.state_dict() , os.path.join(direc, "D_{}.pt").format(epoch+1))
+
+                loss_dict = {"G": G_losses, "D": D_losses, "W": W_losses}
+                with open(os.path.join(direc, "loss_trajecs_{}.pkl".format(epoch+1)), "wb") as f:
+                    pickle.dump(loss_dict,f)
+
+            except Exception as e:
+                print("Problem saving")
+                print(e)
+
+        # save the final results
+        if save_results:
+            direc = os.path.join(  "GAN_results_piano", "Gd={}_Dd={}_e={}_lr={}_b={}_z={}_k={}".format(G_d, D_d, cumulated_epochs, lr, batch_size, z_size, k)  )
+            if not os.path.exists(direc):
+                os.makedirs(direc)
+
+            try:
+                torch.save(G.state_dict() , os.path.join(direc, "G_final.pt"))
+                torch.save(D.state_dict() , os.path.join(direc, "D_final.pt"))
+
+                loss_dict = {"G": G_losses, "D": D_losses, "W": W_losses}
+                with open(os.path.join(direc, "loss_trajecs_final.pkl"), "wb") as f:
+                    pickle.dump(loss_dict,f)
+
+            except Exception as e:
+                print("Problem saving")
+                print(e)
+
+    return G,D, G_losses, D_losses, W_losses
+
+
+if __name__ =="__main__":
+    G, D, G_losses, D_losses, W_losses = train_GAN(epochs=500, lr=0.0001, batch_size=64, z_size=100, device=device, G_d=64, D_d=64, k=5, save_results=True)
