@@ -16,4 +16,4 @@ $ python3 GANs.py
 
 ***VAE***
 
-The VAE model was implemented in jupyter notebook and one can run the VAE following the scripts in the notebook.
+The VAE model was implemented in jupyter notebook and one can run the VAE by following the scripts in the notebook.
