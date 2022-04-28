@@ -577,7 +577,7 @@ class Discriminator_small(nn.Module): # technically a critic
         return out
     
 
-def train_GAN(epochs, lr, batch_size, z_size, device, G_d, D_d, k=2, save_results=True, pretrained=None):
+def train_GAN(epochs, lr, batch_size, z_size, device, G_d, D_d, data_dir, k=2, save_results=True, pretrained=None):
     
 #     G = Generator_small(input_size=z_size, d=G_d).to(device)
 #     D = Discriminator_small(d=D_d, device=device).to(device)
@@ -601,7 +601,7 @@ def train_GAN(epochs, lr, batch_size, z_size, device, G_d, D_d, k=2, save_result
     G_opt = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.9)) # CHANGE THIS?
     D_opt = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.9))
 
-    dataset = Piano_DS(files=p50, sr=4096, output_len=4*4096)
+    dataset = Piano_DS(files=data_dir, sr=4096, output_len=4*4096)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     cumulated_epochs = pretrained_epochs + epochs
@@ -712,4 +712,15 @@ def train_GAN(epochs, lr, batch_size, z_size, device, G_d, D_d, k=2, save_result
 
 
 if __name__ =="__main__":
-    G, D, G_losses, D_losses, W_losses = train_GAN(epochs=500, lr=0.0001, batch_size=64, z_size=100, device=device, G_d=64, D_d=64, k=5, save_results=True)
+    parser = argparse.ArgumentParser(description='GAN')
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--epochs', type=int, default=500)
+    parser.add_argument('--z_size', type=int, default=64)
+    parser.add_argument('--G_d', type=int, default=64)
+    parser.add_argument('--D_d', type=int, default=64)
+    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--data_dir', type=str, default="")
+    args = parser.parse_args()
+    
+    G, D, G_losses, D_losses, W_losses = train_GAN(epochs=args.epochs, lr=args.lr, batch_size=args.batch_size, z_size=args.z_size, device=device, G_d=args.G_d, D_d=args.D_d, data_dir=args.data_dir, k=5, save_results=True)
+    
