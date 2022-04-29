@@ -11,7 +11,7 @@ To run the models, you need to download the [Piano](http://deepyeti.ucsd.edu/cdo
 
 To run the GAN model, 
 ```
-$ python3 GANs.py --batch_size BATCH --epochs EPOCH --lr LR --data_dir /path/to/data/ --G_d GD --D_d DD --z_size Z
+$ python3 train.py --batch_size BATCH --epochs EPOCH --lr LR --data_dir /path/to/data/ --G_d GD --D_d DD --z_size Z
 ```
 
 ***VAE***
