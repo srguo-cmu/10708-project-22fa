@@ -39,3 +39,8 @@ The possible command-line arguments are as follows:
 ***VAE***
 
 The VAE model was implemented in jupyter notebook and one can run the VAE by following the scripts in the notebook.
+
+
+***Robustness Experiment***
+To run the robustness analysis, follow the example in the script ``` robustness_eval_fns.py```
+
